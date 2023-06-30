@@ -1,4 +1,3 @@
-
 //----------Import Libraries----------//
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
@@ -7,6 +6,9 @@
 #include "printf.h"
 #include "RF24.h"
 
+#include <ros.h>
+#include <std_msgs/Int32.h>
+//#include <your_package_name/PotentiometerData.h>
 
 
 
@@ -59,6 +61,28 @@ bool role = false;  // true = TX role, false = RX role
 // on every successful transmission
 float payload = 0.0;
 
+struct universal_remote_data {
+
+float j0_x_val;
+float j0_y_val;
+float p0_val;
+
+float j1_x_val;
+float j1_y_val;
+float p1_val;
+
+float s0_val;
+float s1_val;
+float s2_val;
+float s3_val;
+// Add more variables as needed
+
+};
+
+//----------ros node----------//
+ros::NodeHandle nh;
+std_msgs::Int32 potentiometer_msg;
+ros::Publisher potentiometer_pub("potentiometer", &potentiometer_msg);
 
 //----------Functions Definitions----------//
 
@@ -93,40 +117,9 @@ void setup() {
   pinMode(s2,INPUT);
   pinMode(s3,INPUT);
 
-  //----------Radio----------//
-  // initialize the transceiver on the SPI bus
-  if (!radio.begin()) {
-    lcd.println(F("radio hardware is not responding!!"));
-    while (1) {}  // hold in infinite loop
-  }
 
-  lcd.println("Radio is on");delay(10000);
-
-  // Set the PA Level low to try preventing power supply related problems
-  // because these examples are likely run with nodes in close proximity to
-  // each other.
-  radio.setPALevel(RF24_PA_LOW);  // RF24_PA_MAX is default.
-
-  // save on transmission time by setting the radio to only transmit the
-  // number of bytes we need to transmit a float
-  radio.setPayloadSize(sizeof(payload));  // float datatype occupies 4 bytes
-
-  // set the TX address of the RX node into the TX pipe
-  radio.openWritingPipe(address[radioNumber]);  // always uses pipe 0
-
-  // set the RX address of the TX node into a RX pipe
-  radio.openReadingPipe(1, address[!radioNumber]);  // using pipe 1
-
-  // additional setup specific to the node's role
-  if (role) {
-    radio.stopListening();  // put radio in TX mode
-  } else {
-    radio.startListening();  // put radio in RX mode
-  }
-
-
-  
-  
+  nh.initNode();
+  nh.advertise(potentiometer_pub); 
   
 }
  
@@ -145,7 +138,6 @@ void loop() {
   Serial.print(",s2:");Serial.print(analogRead(s2));
   Serial.print(",s3:");Serial.print(analogRead(s3)); 
   Serial.println();
-  delay(0); 
 
   //----------LCDPrintValues
   // clear the screen
@@ -159,7 +151,12 @@ void loop() {
   lcd.print(",j0_y:");
   lcd.print(analogRead(j0_y));
 
+  //----------ros publish----------//
+  potentiometer_msg.data = analogRead(j0_x);
+  potentiometer_pub.publish(&potentiometer_msg);
+  nh.spinOnce();
+  
   //----------delay----------//
-  delay(10);
+  delay(1000);
   
 }
